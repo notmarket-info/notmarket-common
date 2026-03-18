@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, "claude/**"]
+  pull_request:
+    branches: [dev, main]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install flake8 black isort
+
+      - name: Check formatting (black)
+        run: black --check --line-length=100 . --exclude="\.git|__pycache__|\.venv|\.egg-info"
+
+      - name: Check imports (isort)
+        run: isort --check-only --profile black . --skip=.git --skip=__pycache__ --skip=.venv --skip=notmarket_common.egg-info
+
+      - name: Run flake8
+        run: |
+          flake8 notmarket_common/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 notmarket_common/ tests/ --count --exit-zero --max-complexity=12 --max-line-length=100 --statistics
+
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install pytest pytest-cov
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short --cov=notmarket_common --cov-report=term-missing --cov-fail-under=100

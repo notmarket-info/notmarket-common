@@ -9,12 +9,14 @@ Shared Python package: delivery (Telegram/Discord), retry (exponential backoff),
 | `delivery.py` | Yes | `TelegramSender`, `DiscordSender`, `CircuitBreaker`, `mask_token`, `_truncate_discord` |
 | `retry.py` | Yes | `retry_with_backoff` with exponential backoff + jitter, retryable exceptions/status codes |
 | `health.py` | No | `start_health_server(port, healthy_fn)` — HTTP `/health` on daemon thread |
+| `db.py` | No | `DatabasePool` — lazy pool (psycopg2), thread-safe, circuit breaker, retry on transient errors. `execute_fetchall()`, `execute_fetchone()`, `execute()` |
+| `formatting.py` | Yes | `category_icon()`, `fmt_usd()`, `fmt_pct()`, `fmt_bold()`, `fmt_italic()`, `fmt_link()`, `fmt_esc()`, `event_url()`, `split_message()` |
 
 ## Usage by Services
 
 | Service | Uses |
 |---------|------|
-| notifier-snapshot | All three modules (re-exports for backward compat) |
+| notifier-snapshot | delivery, retry, health, formatting |
 | data-indexer | `TelegramSender`, `DiscordSender` (delivery + generate_videos) |
 | signal-bot | `TelegramSender`, `start_health_server` |
 | monitor-ingest | `TelegramSender` (alerter) |
