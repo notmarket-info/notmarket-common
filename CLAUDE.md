@@ -15,8 +15,9 @@ Shared Python package: delivery (Telegram/Discord), retry (exponential backoff),
 | Service | Uses |
 |---------|------|
 | notifier-snapshot | All three modules (re-exports for backward compat) |
-| data-indexer | `retry_with_backoff` in delivery.py |
+| data-indexer | `TelegramSender`, `DiscordSender` (delivery + generate_videos) |
 | signal-bot | `TelegramSender`, `start_health_server` |
+| monitor-ingest | `TelegramSender` (alerter) |
 
 ## Key APIs
 
@@ -26,6 +27,7 @@ sender = TelegramSender(token, chat_id, parse_mode="HTML", timeout=8,
                          max_retries=2, circuit_breaker=None, disable_preview=True)
 sender.send_message(text, buttons=None)
 sender.send_photo(image, caption=None, buttons=None)
+sender.send_video(video, caption=None)
 sender.send(text, image=None, buttons=None, long_caption=None)
 
 # Discord

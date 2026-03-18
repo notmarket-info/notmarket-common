@@ -21,7 +21,13 @@ def mask_token(msg):
 
 
 class CircuitBreaker:
-    """Simple circuit breaker — opens after consecutive failures, auto-resets."""
+    """Simple circuit breaker for delivery channels.
+
+    Opens after consecutive failures, auto-resets after timeout.
+
+    NOT thread-safe — use one instance per thread or protect with
+    an external lock in multi-threaded contexts.
+    """
 
     def __init__(self, threshold=5, timeout_secs=60):
         self._threshold = threshold
@@ -180,6 +186,38 @@ class TelegramSender:
             if self._breaker:
                 self._breaker.record_failure()
             log.error("Telegram photo delivery error: %s", mask_token(e))
+
+    def send_video(self, video, *, caption=None):
+        """Send a video with optional caption.
+
+        Args:
+            video: Video bytes or file-like object.
+            caption: Optional caption text.
+        """
+        if not self.is_available:
+            return
+        if self._breaker and self._breaker.is_open:
+            log.warning("Telegram circuit breaker open, skipping delivery")
+            return
+
+        try:
+            data = {
+                "chat_id": self.chat_id,
+                "parse_mode": self.parse_mode,
+            }
+            if caption:
+                data["caption"] = caption
+            self._post(
+                f"https://api.telegram.org/bot{self.bot_token}/sendVideo",
+                data=data,
+                files={"video": ("video.mp4", video)},
+            )
+            if self._breaker:
+                self._breaker.record_success()
+        except Exception as e:
+            if self._breaker:
+                self._breaker.record_failure()
+            log.error("Telegram video delivery error: %s", mask_token(e))
 
     def send(self, text, *, image=None, buttons=None, long_caption=None):
         """High-level send: text with optional image.

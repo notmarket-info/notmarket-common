@@ -248,6 +248,79 @@ class TestTelegramSendPhoto:
         sender.send_photo(b"png-bytes")  # should not raise
 
 
+# -- TelegramSender.send_video ------------------------------------------------
+
+
+class TestTelegramSendVideo:
+    @patch("notmarket_common.delivery.requests.post")
+    def test_send_video_posts_to_api(self, mock_post):
+        mock_post.return_value = _mock_response()
+        sender = TelegramSender("tok", "123")
+        sender.send_video(b"mp4-bytes", caption="my video")
+        url = mock_post.call_args[0][0]
+        assert "sendVideo" in url
+        assert "files" in mock_post.call_args.kwargs
+
+    @patch("notmarket_common.delivery.requests.post")
+    def test_send_video_includes_caption(self, mock_post):
+        mock_post.return_value = _mock_response()
+        sender = TelegramSender("tok", "123")
+        sender.send_video(b"mp4-bytes", caption="Hello")
+        data = mock_post.call_args.kwargs["data"]
+        assert data["caption"] == "Hello"
+
+    @patch("notmarket_common.delivery.requests.post")
+    def test_send_video_no_caption(self, mock_post):
+        mock_post.return_value = _mock_response()
+        sender = TelegramSender("tok", "123")
+        sender.send_video(b"mp4-bytes")
+        data = mock_post.call_args.kwargs["data"]
+        assert "caption" not in data
+
+    @patch("notmarket_common.delivery.requests.post")
+    def test_send_video_parse_mode(self, mock_post):
+        mock_post.return_value = _mock_response()
+        sender = TelegramSender("tok", "123")
+        sender.send_video(b"mp4-bytes", caption="x")
+        data = mock_post.call_args.kwargs["data"]
+        assert data["parse_mode"] == "HTML"
+
+    @patch("notmarket_common.delivery.requests.post")
+    def test_send_video_skips_when_breaker_open(self, mock_post):
+        breaker = CircuitBreaker(threshold=1)
+        breaker.record_failure()
+        sender = TelegramSender("tok", "123", circuit_breaker=breaker)
+        sender.send_video(b"mp4-bytes")
+        mock_post.assert_not_called()
+
+    def test_send_video_noop_no_credentials(self):
+        sender = TelegramSender("", "")
+        sender.send_video(b"mp4-bytes")  # should not raise
+
+    @patch("notmarket_common.delivery.requests.post")
+    def test_send_video_error_does_not_raise(self, mock_post):
+        mock_post.side_effect = Exception("fail")
+        sender = TelegramSender("tok", "123", max_retries=0)
+        sender.send_video(b"mp4-bytes")  # should not raise
+
+    @patch("notmarket_common.delivery.requests.post")
+    def test_send_video_error_increments_breaker(self, mock_post):
+        mock_post.side_effect = Exception("fail")
+        breaker = CircuitBreaker(threshold=5)
+        sender = TelegramSender("tok", "123", max_retries=0, circuit_breaker=breaker)
+        sender.send_video(b"mp4-bytes")
+        assert breaker._failure_count == 1
+
+    @patch("notmarket_common.delivery.requests.post")
+    def test_send_video_success_resets_breaker(self, mock_post):
+        mock_post.return_value = _mock_response()
+        breaker = CircuitBreaker(threshold=5)
+        breaker.record_failure()
+        sender = TelegramSender("tok", "123", circuit_breaker=breaker)
+        sender.send_video(b"mp4-bytes")
+        assert breaker._failure_count == 0
+
+
 # -- TelegramSender.send (high-level) ----------------------------------------
 
 
@@ -430,18 +503,14 @@ class TestDiscordSender:
         breaker = CircuitBreaker(threshold=5)
         breaker.record_failure()
         breaker.record_failure()
-        sender = DiscordSender(
-            "https://discord.com/api/webhooks/test", circuit_breaker=breaker
-        )
+        sender = DiscordSender("https://discord.com/api/webhooks/test", circuit_breaker=breaker)
         sender.send("hello")
         assert breaker._failure_count == 0
 
     @patch("notmarket_common.delivery.requests.post")
     def test_send_no_breaker(self, mock_post):
         mock_post.return_value = _mock_response()
-        sender = DiscordSender(
-            "https://discord.com/api/webhooks/test", circuit_breaker=False
-        )
+        sender = DiscordSender("https://discord.com/api/webhooks/test", circuit_breaker=False)
         sender.send("hello")
         mock_post.assert_called_once()
 
